@@ -1,58 +1,43 @@
-#
-# Conditional build:
-%bcond_with	qt5	# use Qt5 instead of Qt4
-#
 Summary:	OAuth 2.0 plugin for Single Sign On daemon
 Summary(pl.UTF-8):	Wtyczka OAuth 2.0 dla demona Single Sign On
 Name:		signon-oauth2
-Version:	0.19
+Version:	0.23
 Release:	1
 License:	LGPL v2.1
 Group:		Libraries
-#Source0Download: http://code.google.com/p/accounts-sso/downloads/list
-Source0:	http://accounts-sso.googlecode.com/files/%{name}-%{version}.tar.bz2
-# Source0-md5:	32aa3b93b5d08c15a8e077d73bda61fa
-URL:		http://code.google.com/p/accounts-sso/
-BuildRequires:	pkgconfig
-%if %{with qt5}
+#Source0Download: https://gitlab.com/accounts-sso/signon-plugin-oauth2/tags?page=2
+Source0:	https://gitlab.com/accounts-sso/signon-plugin-oauth2/repository/archive.tar.bz2?ref=VERSION_%{version}
+# Source0-md5:	dc1f73e6c841b5f318f1f53d29e220a1
+URL:		https://gitlab.com/accounts-sso/signon-plugin-oauth2
 BuildRequires:	Qt5Core-devel >= 5
 BuildRequires:	Qt5Network-devel >= 5
 BuildRequires:	Qt5Test-devel >= 5
 BuildRequires:	Qt5XmlPatterns-devel >= 5
 BuildRequires:	libsignon-qt5-devel
+BuildRequires:	pkgconfig
 BuildRequires:	qt5-build >= 5
 BuildRequires:	qt5-qmake >= 5
-%else
-BuildRequires:	QtCore-devel >= 4
-BuildRequires:	QtNetwork-devel >= 4
-BuildRequires:	QtTest-devel >= 4
-BuildRequires:	QtXmlPatterns-devel >= 4
-BuildRequires:	libsignon-qt-devel
-BuildRequires:	qjson-devel
-BuildRequires:	qt4-build >= 4
-BuildRequires:	qt4-qmake >= 4
-%endif
-Requires:	signon
+# qt5-based
+BuildRequires:	signon-devel >= 8.58
+Requires:	signon >= 8.58
 BuildRoot:	%{tmpdir}/%{name}-%{version}-root-%(id -u -n)
 
 %description
-OAuth 2.0 plugin for Single Sign On daemon.
+This plugin for the Accounts-SSO SignOn daemon handles the OAuth
+1.0 and 2.0 authentication protocols.
 
 %description -l pl.UTF-8
-Wtyczka OAuth 2.0 dla demona Single Sign On.
+Ta wtyczka demona Accounts-SSO SignOn obsługuje protokołu
+uwierzytelniania OAuth 1.0 i 2.0.
 
 %package devel
 Summary:	Development files for Single Sign On OAuth 2.0 plugin
 Summary(pl.UTF-8):	Pliki programistyczne wtyczki OAuth 2.0 dla usługi Single Sign On
 Group:		Development/Libraries
 # doesn't require base
-%if %{with qt5}
 Requires:	Qt5Core-devel >= 5
-%else
-Requires:	QtCore-devel >= 4
-%endif
 # signon-plugins
-Requires:	signon-devel
+Requires:	signon-devel >= 8.58
 
 %description devel
 Development files for Single Sign On OAuth 2.0 plugin.
@@ -61,10 +46,10 @@ Development files for Single Sign On OAuth 2.0 plugin.
 Pliki programistyczne wtyczki OAuth 2.0 dla usługi Single Sign On.
 
 %prep
-%setup -q
+%setup -q -n signon-plugin-oauth2-VERSION_%{version}-b74b5397992caddeb32a6158c9295126c55a3025
 
 %build
-qmake-qt4 signon-oauth2.pro \
+qmake-qt5 signon-oauth2.pro \
 	QMAKE_CXX="%{__cxx}" \
 	QMAKE_CXXFLAGS_RELEASE="%{rpmcxxflags}" \
 	QMAKE_LFLAGS_RELEASE="%{rpmldflags}"
@@ -87,6 +72,7 @@ rm -rf $RPM_BUILD_ROOT
 
 %files
 %defattr(644,root,root,755)
+%doc README.md
 %dir %{_sysconfdir}/signon-ui
 %dir %{_sysconfdir}/signon-ui/webkit-options.d
 %config(noreplace) %verify(not md5 mtime size) %{_sysconfdir}/signon-ui/webkit-options.d/m.facebook.com.conf
