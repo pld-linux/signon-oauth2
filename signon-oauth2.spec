@@ -6,7 +6,9 @@ Release:	1
 License:	LGPL v2.1
 Group:		Libraries
 #Source0Download: https://gitlab.com/accounts-sso/signon-plugin-oauth2/tags?page=2
-Source0:	https://gitlab.com/accounts-sso/signon-plugin-oauth2/repository/archive.tar.bz2?ref=VERSION_%{version}
+# TODO: in the future use fake GET arg to force sane filename on df
+#Source0:	https://gitlab.com/accounts-sso/signon-plugin-oauth2/repository/archive.tar.bz2?ref=VERSION_%{version}&fake_out=/%{name}-%{version}.tar.bz2
+Source0:	archive.tar.bz2%3Fref=VERSION_%{version}
 # Source0-md5:	dc1f73e6c841b5f318f1f53d29e220a1
 URL:		https://gitlab.com/accounts-sso/signon-plugin-oauth2
 BuildRequires:	Qt5Core-devel >= 5
