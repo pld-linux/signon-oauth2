@@ -2,7 +2,7 @@ Summary:	OAuth 2.0 plugin for Single Sign On daemon
 Summary(pl.UTF-8):	Wtyczka OAuth 2.0 dla demona Single Sign On
 Name:		signon-oauth2
 Version:	0.23
-Release:	1
+Release:	2
 License:	LGPL v2.1
 Group:		Libraries
 #Source0Download: https://gitlab.com/accounts-sso/signon-plugin-oauth2/tags?page=2
@@ -10,6 +10,7 @@ Group:		Libraries
 #Source0:	https://gitlab.com/accounts-sso/signon-plugin-oauth2/repository/archive.tar.bz2?ref=VERSION_%{version}&fake_out=/%{name}-%{version}.tar.bz2
 Source0:	archive.tar.bz2%3Fref=VERSION_%{version}
 # Source0-md5:	dc1f73e6c841b5f318f1f53d29e220a1
+Patch0:		%{name}-x32.patch
 URL:		https://gitlab.com/accounts-sso/signon-plugin-oauth2
 BuildRequires:	Qt5Core-devel >= 5
 BuildRequires:	Qt5Network-devel >= 5
@@ -49,6 +50,7 @@ Pliki programistyczne wtyczki OAuth 2.0 dla usługi Single Sign On.
 
 %prep
 %setup -q -n signon-plugin-oauth2-VERSION_%{version}-b74b5397992caddeb32a6158c9295126c55a3025
+%patch0 -p1
 
 %build
 qmake-qt5 signon-oauth2.pro \

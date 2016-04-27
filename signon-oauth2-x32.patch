@@ -1,0 +1,15 @@
+--- signon-plugin-oauth2-VERSION_0.23-b74b5397992caddeb32a6158c9295126c55a3025/common-project-config.pri.orig	2015-09-30 08:43:00.000000000 +0200
++++ signon-plugin-oauth2-VERSION_0.23-b74b5397992caddeb32a6158c9295126c55a3025/common-project-config.pri	2016-04-27 22:15:48.502441372 +0200
+@@ -48,11 +48,7 @@
+     ARCH = $$system(uname -m)
+ }
+ 
+-contains( ARCH, x86_64 ) {
+-    INSTALL_LIBDIR = $${INSTALL_PREFIX}/lib64
+-} else {
+-    INSTALL_LIBDIR = $${INSTALL_PREFIX}/lib
+-}
++INSTALL_LIBDIR = $$[QT_INSTALL_LIBS]
+ 
+ # default library directory can be overriden by defining LIBDIR when
+ # running qmake
