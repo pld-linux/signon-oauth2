@@ -48,7 +48,7 @@ Pliki programistyczne wtyczki OAuth 2.0 dla usługi Single Sign On.
 
 %prep
 %setup -q -n signon-plugin-oauth2-VERSION_%{version}-2dd9ba521a0dd4277c4bf6970a7f4e3894fd85ae
-%patch0 -p1
+%patch -P0 -p1
 
 %build
 qmake-qt5 signon-oauth2.pro \
