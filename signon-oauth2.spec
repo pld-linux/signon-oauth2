@@ -14,7 +14,7 @@ Summary:	OAuth 2.0 plugin for Single Sign On daemon
 Summary(pl.UTF-8):	Wtyczka OAuth 2.0 dla demona Single Sign On
 Name:		signon-oauth2
 Version:	0.25
-Release:	0.1
+Release:	1
 License:	LGPL v2.1
 Group:		Libraries
 #Source0Download: https://gitlab.com/accounts-sso/signon-plugin-oauth2/tags?sort=updated_desc
@@ -22,6 +22,8 @@ Source0:	https://gitlab.com/accounts-sso/signon-plugin-oauth2/-/archive/VERSION_
 # Source0-md5:	8d6f21d4bcfb527dddc20129f6972d14
 Patch0:		%{name}-x32.patch
 Patch1:		signon-plugin-oauth2-git.patch
+# from https://gitlab.com/nicolasfella/signon-plugin-oauth2/-/commits/qt6
+Patch2:		signon-plugin-oauth2-qt6-git.patch
 URL:		https://gitlab.com/accounts-sso/signon-plugin-oauth2
 BuildRequires:	Qt%{qtmajor}Core-devel >= %{qt_ver}
 BuildRequires:	Qt%{qtmajor}Network-devel >= %{qt_ver}
@@ -30,6 +32,7 @@ BuildRequires:	Qt%{qtmajor}Test-devel >= %{qt_ver}
 BuildRequires:	Qt%{qtmajor}XmlPatterns-devel >= %{qt_ver}
 %endif
 BuildRequires:	libsignon-qt%{qtmajor}-devel
+BuildRequires:	libstdc++-devel >= 6:7
 BuildRequires:	pkgconfig
 BuildRequires:	qt%{qtmajor}-build >= %{qt_ver}
 BuildRequires:	qt%{qtmajor}-qmake >= %{qt_ver}
@@ -73,12 +76,14 @@ Pliki programistyczne wtyczki OAuth 2.0 dla usługi Single Sign On.
 %setup -q -n signon-plugin-oauth2-VERSION_%{version}
 %patch -P0 -p1
 %patch -P1 -p1
+%patch -P2 -p1
 
 %build
 qmake-qt%{qtmajor} signon-oauth2.pro \
+	CONFIG+=make_examples \
 	QMAKE_CXX="%{__cxx}" \
 	QMAKE_CXXFLAGS_RELEASE="%{rpmcxxflags}" \
-	QMAKE_LFLAGS_RELEASE="%{rpmldflags}"
+	QMAKE_LFLAGS_RELEASE="%{rpmldflags}" \
 	
 %{__make}
 
