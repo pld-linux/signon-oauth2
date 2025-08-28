@@ -1,0 +1,585 @@
+From d38cd1e356506f6ded2211eba8f1127e846fdf2d Mon Sep 17 00:00:00 2001
+From: Alberto Mardegan <mardy@users.sourceforge.net>
+Date: Sun, 20 Dec 2020 22:30:43 +0300
+Subject: [PATCH] Don't use deprecated QUrl methods to inspect the query
+
+---
+ src/oauth1plugin.cpp | 26 ++++++++------
+ src/oauth2plugin.cpp | 83 ++++++++++++++++++++++----------------------
+ src/oauth2plugin.h   |  4 ++-
+ 3 files changed, 59 insertions(+), 54 deletions(-)
+
+diff --git a/src/oauth1plugin.cpp b/src/oauth1plugin.cpp
+index 8892d62..57c036d 100644
+--- a/src/oauth1plugin.cpp
++++ b/src/oauth1plugin.cpp
+@@ -27,6 +27,7 @@
+ #include "oauth2tokendata.h"
+ 
+ #include <QUrl>
++#include <QUrlQuery>
+ #include <QNetworkReply>
+ #include <QNetworkRequest>
+ #include <QDateTime>
+@@ -146,12 +147,14 @@ void OAuth1Plugin::sendOAuth1AuthRequest()
+     Q_D(OAuth1Plugin);
+ 
+     QUrl url(d->m_oauth1Data.AuthorizationEndpoint());
+-    url.addQueryItem(OAUTH_TOKEN, d->m_oauth1Token);
++    QUrlQuery query(url);
++    query.addQueryItem(OAUTH_TOKEN, d->m_oauth1Token);
+     if (!d->m_oauth1ScreenName.isEmpty()) {
+         // Prefill username for Twitter
+-        url.addQueryItem(SCREEN_NAME, d->m_oauth1ScreenName);
+-        url.addQueryItem(FORCE_LOGIN, d->m_oauth1ScreenName);
++        query.addQueryItem(SCREEN_NAME, d->m_oauth1ScreenName);
++        query.addQueryItem(FORCE_LOGIN, d->m_oauth1ScreenName);
+     }
++    url.setQuery(query);
+     TRACE() << "URL = " << url.toString();
+     SignOn::UiSessionData uiSession;
+     uiSession.setOpenUrl(url.toString());
+@@ -365,9 +368,10 @@ QByteArray OAuth1Plugin::constructSignatureBaseString(const QString &aUrl,
+ 
+     QMap<QString, QString> oAuthHeaderMap;
+     QUrl fullUrl(aUrl);
++    QUrlQuery query(fullUrl);
+ 
+     // Constructing the base string as per RFC 5849. Sec 3.4.1
+-    QList<QPair<QString, QString> > queryItems = fullUrl.queryItems();
++    QList<QPair<QString, QString> > queryItems = query.queryItems();
+     QPair<QString, QString> queryItem;
+     foreach (queryItem, queryItems) {
+         oAuthHeaderMap[queryItem.first] = queryItem.second;
+@@ -500,21 +504,21 @@ void OAuth1Plugin::userActionFinished(const SignOn::UiSessionData &data)
+     TRACE() << data.UrlResponse();
+ 
+     // Checking if authorization server granted access
+-    QUrl url = QUrl(data.UrlResponse());
+-    if (url.hasQueryItem(AUTH_ERROR)) {
++    QUrlQuery query(QUrl(data.UrlResponse()));
++    if (query.hasQueryItem(AUTH_ERROR)) {
+         TRACE() << "Server denied access permission";
+-        emit error(Error(Error::NotAuthorized, url.queryItemValue(AUTH_ERROR)));
++        emit error(Error(Error::NotAuthorized, query.queryItemValue(AUTH_ERROR)));
+         return;
+     }
+ 
+-    if (url.hasQueryItem(OAUTH_VERIFIER)) {
+-        d->m_oauth1TokenVerifier = url.queryItemValue(OAUTH_VERIFIER);
++    if (query.hasQueryItem(OAUTH_VERIFIER)) {
++        d->m_oauth1TokenVerifier = query.queryItemValue(OAUTH_VERIFIER);
+         d->m_oauth1Data.setCallback(QString());
+         d->m_oauth1RequestType = OAUTH1_POST_ACCESS_TOKEN;
+         sendOAuth1PostRequest();
+     }
+-    else if (url.hasQueryItem(OAUTH_PROBLEM)) {
+-        handleOAuth1ProblemError(url.queryItemValue(OAUTH_PROBLEM));
++    else if (query.hasQueryItem(OAUTH_PROBLEM)) {
++        handleOAuth1ProblemError(query.queryItemValue(OAUTH_PROBLEM));
+     }
+     else {
+         emit error(Error(Error::NotAuthorized, QString("oauth_verifier missing")));
+diff --git a/src/oauth2plugin.cpp b/src/oauth2plugin.cpp
+index 57df6d8..d65e261 100644
+--- a/src/oauth2plugin.cpp
++++ b/src/oauth2plugin.cpp
+@@ -175,22 +175,24 @@ void OAuth2Plugin::sendOAuth2AuthRequest()
+     Q_D(OAuth2Plugin);
+ 
+     QUrl url = getAuthUrl();
+-    url.addQueryItem(CLIENT_ID, d->m_oauth2Data.ClientId());
++    QUrlQuery query(url);
++    query.addQueryItem(CLIENT_ID, d->m_oauth2Data.ClientId());
+     QString redirectUri = d->m_oauth2Data.RedirectUri();
+-    url.addQueryItem(REDIRECT_URI, QUrl::toPercentEncoding(redirectUri));
++    query.addQueryItem(REDIRECT_URI, QUrl::toPercentEncoding(redirectUri));
+     if (!d->m_oauth2Data.DisableStateParameter()) {
+         d->m_state = QString::number(qrand());
+-        url.addQueryItem(STATE, d->m_state);
++        query.addQueryItem(STATE, d->m_state);
+     }
+     QStringList responseType = d->m_oauth2Data.ResponseType();
+     if (!responseType.isEmpty()) {
+-        url.addQueryItem(RESPONSE_TYPE, responseType.join(" "));
++        query.addQueryItem(RESPONSE_TYPE, responseType.join(" "));
+     }
+     QStringList scopes = d->m_oauth2Data.Scope();
+     if (!scopes.isEmpty()) {
+         // Passing list of scopes
+-        url.addQueryItem(SCOPE, QUrl::toPercentEncoding(scopes.join(" ")));
++        query.addQueryItem(SCOPE, QUrl::toPercentEncoding(scopes.join(" ")));
+     }
++    url.setQuery(query);
+     TRACE() << "Url = " << url.toString();
+     SignOn::UiSessionData uiSession;
+     uiSession.setOpenUrl(url.toString());
+@@ -400,9 +402,10 @@ void OAuth2Plugin::userActionFinished(const SignOn::UiSessionData &data)
+ 
+     // Checking if authorization server granted access
+     QUrl url = QUrl(data.UrlResponse());
+-    if (url.hasQueryItem(AUTH_ERROR)) {
++    QUrlQuery query(url);
++    if (query.hasQueryItem(AUTH_ERROR)) {
+         TRACE() << "Server denied access permission";
+-        emit error(Error(Error::NotAuthorized, url.queryItemValue(AUTH_ERROR)));
++        emit error(Error(Error::NotAuthorized, query.queryItemValue(AUTH_ERROR)));
+         return;
+     }
+ 
+@@ -457,46 +460,42 @@ void OAuth2Plugin::userActionFinished(const SignOn::UiSessionData &data)
+         // 2. Resource owner credentials (username, password)
+         // 3. Assertion (assertion_type, assertion)
+         // 4. Refresh Token (refresh_token)
+-        QUrl newUrl;
+-        QString query = d->m_oauth2Data.TokenQuery();
+-        if (!query.isEmpty()) {
+-            newUrl.setQuery(query);
+-        }
++        QUrlQuery tokenQuery(d->m_oauth2Data.TokenQuery());
+ 
+-        if (url.hasQueryItem(AUTH_CODE)) {
++        if (query.hasQueryItem(AUTH_CODE)) {
+             if (!d->m_oauth2Data.DisableStateParameter() &&
+-                d->m_state != url.queryItemValue(STATE)) {
++                d->m_state != query.queryItemValue(STATE)) {
+                 Q_EMIT error(Error(Error::NotAuthorized,
+                                    QString("'state' parameter mismatch")));
+                 return;
+             }
+-            QString code = url.queryItemValue(AUTH_CODE);
+-            newUrl.addQueryItem(GRANT_TYPE, AUTHORIZATION_CODE);
+-            newUrl.addQueryItem(AUTH_CODE, code);
+-            newUrl.addQueryItem(REDIRECT_URI, d->m_oauth2Data.RedirectUri());
+-            sendOAuth2PostRequest(newUrl,
++            QString code = query.queryItemValue(AUTH_CODE);
++            tokenQuery.addQueryItem(GRANT_TYPE, AUTHORIZATION_CODE);
++            tokenQuery.addQueryItem(AUTH_CODE, code);
++            tokenQuery.addQueryItem(REDIRECT_URI, d->m_oauth2Data.RedirectUri());
++            sendOAuth2PostRequest(tokenQuery,
+                                   GrantType::AuthorizationCode);
+         }
+-        else if (url.hasQueryItem(USERNAME) && url.hasQueryItem(PASSWORD)) {
+-            QString username = url.queryItemValue(USERNAME);
+-            QString password = url.queryItemValue(PASSWORD);
+-            newUrl.addQueryItem(GRANT_TYPE, USER_BASIC);
+-            newUrl.addQueryItem(USERNAME, username);
+-            newUrl.addQueryItem(PASSWORD, password);
+-            sendOAuth2PostRequest(newUrl,
++        else if (query.hasQueryItem(USERNAME) && query.hasQueryItem(PASSWORD)) {
++            QString username = query.queryItemValue(USERNAME);
++            QString password = query.queryItemValue(PASSWORD);
++            tokenQuery.addQueryItem(GRANT_TYPE, USER_BASIC);
++            tokenQuery.addQueryItem(USERNAME, username);
++            tokenQuery.addQueryItem(PASSWORD, password);
++            sendOAuth2PostRequest(tokenQuery,
+                                   GrantType::UserBasic);
+         }
+-        else if (url.hasQueryItem(ASSERTION_TYPE) && url.hasQueryItem(ASSERTION)) {
+-            QString assertion_type = url.queryItemValue(ASSERTION_TYPE);
+-            QString assertion = url.queryItemValue(ASSERTION);
+-            newUrl.addQueryItem(GRANT_TYPE, ASSERTION);
+-            newUrl.addQueryItem(ASSERTION_TYPE, assertion_type);
+-            newUrl.addQueryItem(ASSERTION, assertion);
+-            sendOAuth2PostRequest(newUrl,
++        else if (query.hasQueryItem(ASSERTION_TYPE) && query.hasQueryItem(ASSERTION)) {
++            QString assertion_type = query.queryItemValue(ASSERTION_TYPE);
++            QString assertion = query.queryItemValue(ASSERTION);
++            tokenQuery.addQueryItem(GRANT_TYPE, ASSERTION);
++            tokenQuery.addQueryItem(ASSERTION_TYPE, assertion_type);
++            tokenQuery.addQueryItem(ASSERTION, assertion);
++            sendOAuth2PostRequest(tokenQuery,
+                                   GrantType::Assertion);
+         }
+-        else if (url.hasQueryItem(REFRESH_TOKEN)) {
+-            QString refresh_token = url.queryItemValue(REFRESH_TOKEN);
++        else if (query.hasQueryItem(REFRESH_TOKEN)) {
++            QString refresh_token = query.queryItemValue(REFRESH_TOKEN);
+             refreshOAuth2Token(refresh_token);
+         }
+         else {
+@@ -688,13 +687,13 @@ void OAuth2Plugin::handleOAuth2Error(const QByteArray &reply)
+ void OAuth2Plugin::refreshOAuth2Token(const QString &refreshToken)
+ {
+     TRACE() << refreshToken;
+-    QUrl url;
+-    url.addQueryItem(GRANT_TYPE, REFRESH_TOKEN);
+-    url.addQueryItem(REFRESH_TOKEN, refreshToken);
+-    sendOAuth2PostRequest(url, GrantType::RefreshToken);
++    QUrlQuery query;
++    query.addQueryItem(GRANT_TYPE, REFRESH_TOKEN);
++    query.addQueryItem(REFRESH_TOKEN, refreshToken);
++    sendOAuth2PostRequest(query, GrantType::RefreshToken);
+ }
+ 
+-void OAuth2Plugin::sendOAuth2PostRequest(QUrl &postData,
++void OAuth2Plugin::sendOAuth2PostRequest(QUrlQuery &postData,
+                                          GrantType::e grantType)
+ {
+     Q_D(OAuth2Plugin);
+@@ -726,8 +725,8 @@ void OAuth2Plugin::sendOAuth2PostRequest(QUrl &postData,
+ 
+     d->m_grantType = grantType;
+ 
+-    TRACE() << "Query string = " << postData;
+-    postRequest(request, postData.encodedQuery());
++    TRACE() << "Query string = " << postData.query(QUrl::FullyDecoded);
++    postRequest(request, postData.query(QUrl::FullyDecoded).toLatin1());
+ }
+ 
+ void OAuth2Plugin::storeResponse(const OAuth2PluginTokenData &response)
+diff --git a/src/oauth2plugin.h b/src/oauth2plugin.h
+index ce551df..a16c316 100644
+--- a/src/oauth2plugin.h
++++ b/src/oauth2plugin.h
+@@ -33,6 +33,8 @@
+ #include "base-plugin.h"
+ #include "oauth2data.h"
+ 
++class QUrlQuery;
++
+ namespace OAuth2PluginNS {
+ 
+ namespace GrantType {
+@@ -74,7 +76,7 @@ private:
+     bool respondWithStoredToken(const QVariantMap &token,
+                                 const QStringList &scopes);
+     void refreshOAuth2Token(const QString &refreshToken);
+-    void sendOAuth2PostRequest(QUrl &postData,
++    void sendOAuth2PostRequest(QUrlQuery &postData,
+                                GrantType::e grantType);
+     void storeResponse(const OAuth2PluginTokenData &response);
+     QVariantMap parseReply(const QByteArray &contentType,
+-- 
+GitLab
+
+From a7db188b4e8d813b32997a26907d82432b4a5c1c Mon Sep 17 00:00:00 2001
+From: Alberto Mardegan <mardy@users.sourceforge.net>
+Date: Sun, 20 Dec 2020 22:32:37 +0300
+Subject: [PATCH] OAuth1: replace deprecated toAscii() with toLatin1()
+
+---
+ src/oauth1plugin.cpp | 22 +++++++++++-----------
+ 1 file changed, 11 insertions(+), 11 deletions(-)
+
+diff --git a/src/oauth1plugin.cpp b/src/oauth1plugin.cpp
+index 57c036d..322e8ca 100644
+--- a/src/oauth1plugin.cpp
++++ b/src/oauth1plugin.cpp
+@@ -281,10 +281,10 @@ void OAuth1Plugin::process(const SignOn::SessionData &inData,
+             if (!providedTokens.ScreenName().isNull())
+                 storeTokens.insert(SCREEN_NAME, providedTokens.ScreenName());
+ 
+-            d->m_oauth1Token = providedTokens.AccessToken().toAscii();
+-            d->m_oauth1TokenSecret = providedTokens.TokenSecret().toAscii();
+-            d->m_oauth1UserId = providedTokens.UserId().toAscii();
+-            d->m_oauth1ScreenName = providedTokens.ScreenName().toAscii();
++            d->m_oauth1Token = providedTokens.AccessToken().toLatin1();
++            d->m_oauth1TokenSecret = providedTokens.TokenSecret().toLatin1();
++            d->m_oauth1UserId = providedTokens.UserId().toLatin1();
++            d->m_oauth1ScreenName = providedTokens.ScreenName().toLatin1();
+ 
+             OAuth2TokenData tokens;
+             d->m_tokens.insert(d->m_key, QVariant::fromValue(storeTokens));
+@@ -556,8 +556,8 @@ void OAuth1Plugin::serverReply(QNetworkReply *reply)
+             const QMap<QString,QString> map = parseTextReply(replyContent);
+             if (d->m_oauth1RequestType == OAUTH1_POST_REQUEST_TOKEN) {
+                 // Extracting the request token, token secret
+-                d->m_oauth1Token = map.value(OAUTH_TOKEN).toAscii();
+-                d->m_oauth1TokenSecret = map.value(OAUTH_TOKEN_SECRET).toAscii();
++                d->m_oauth1Token = map.value(OAUTH_TOKEN).toLatin1();
++                d->m_oauth1TokenSecret = map.value(OAUTH_TOKEN_SECRET).toLatin1();
+                 if (d->m_oauth1Token.isEmpty() ||
+                     !map.contains(OAUTH_TOKEN_SECRET)) {
+                     TRACE() << "OAuth request token is empty or secret is missing";
+@@ -569,8 +569,8 @@ void OAuth1Plugin::serverReply(QNetworkReply *reply)
+             }
+             else if (d->m_oauth1RequestType == OAUTH1_POST_ACCESS_TOKEN) {
+                 // Extracting the access token
+-                d->m_oauth1Token = map.value(OAUTH_TOKEN).toAscii();
+-                d->m_oauth1TokenSecret = map.value(OAUTH_TOKEN_SECRET).toAscii();
++                d->m_oauth1Token = map.value(OAUTH_TOKEN).toLatin1();
++                d->m_oauth1TokenSecret = map.value(OAUTH_TOKEN_SECRET).toLatin1();
+                 if (d->m_oauth1Token.isEmpty() ||
+                     !map.contains(OAUTH_TOKEN_SECRET)) {
+                     TRACE()<< "OAuth access token is empty or secret is missing";
+@@ -620,8 +620,8 @@ OAuth1Plugin::oauth1responseFromMap(const QVariantMap &map)
+ 
+     TRACE() << "Response:" << map;
+     OAuth1PluginTokenData response(map);
+-    response.setAccessToken(map[OAUTH_TOKEN].toString().toAscii());
+-    response.setTokenSecret(map[OAUTH_TOKEN_SECRET].toString().toAscii());
++    response.setAccessToken(map[OAUTH_TOKEN].toString().toLatin1());
++    response.setTokenSecret(map[OAUTH_TOKEN_SECRET].toString().toLatin1());
+ 
+     // Store also (possible) user_id & screen_name
+     if (map.contains(USER_ID)) {
+@@ -688,7 +688,7 @@ void OAuth1Plugin::sendOAuth1PostRequest()
+     else {
+         Q_ASSERT_X(false, __FUNCTION__, "Invalid OAuth1 POST request");
+     }
+-    request.setRawHeader(QByteArray("Authorization"), authHeader.toAscii());
++    request.setRawHeader(QByteArray("Authorization"), authHeader.toLatin1());
+ 
+     postRequest(request, QByteArray());
+ }
+-- 
+GitLab
+
+From ee8cc854d941d6ad91db66958d58c64fb6fa1589 Mon Sep 17 00:00:00 2001
+From: Alberto Mardegan <mardy@users.sourceforge.net>
+Date: Sun, 20 Dec 2020 22:34:42 +0300
+Subject: [PATCH] Replace depreacated toTime_t() with toSecsSinceEpoch()
+
+---
+ src/oauth1plugin.cpp       |  5 +++--
+ src/oauth2plugin.cpp       |  4 ++--
+ tests/oauth2plugintest.cpp | 15 +++++++++------
+ 3 files changed, 14 insertions(+), 10 deletions(-)
+
+diff --git a/src/oauth1plugin.cpp b/src/oauth1plugin.cpp
+index 322e8ca..8ec7645 100644
+--- a/src/oauth1plugin.cpp
++++ b/src/oauth1plugin.cpp
+@@ -198,7 +198,7 @@ bool OAuth1Plugin::respondWithStoredToken(const QVariantMap &token,
+         timeToExpiry =
+             token.value(EXPIRY).toUInt() +
+             token.value(TIMESTAMP).toUInt() -
+-            QDateTime::currentDateTime().toTime_t();
++            QDateTime::currentDateTime().toSecsSinceEpoch();
+         if (timeToExpiry < 0) {
+             TRACE() << "Stored token is expired";
+             return false;
+@@ -444,7 +444,8 @@ QString OAuth1Plugin::createOAuth1Header(const QString &aUrl,
+                       .arg(urlEncode(oauthNonce)));
+     authHeader.append(DELIMITER);
+     // Timestamp
+-    QString oauthTimestamp = QString("%1").arg(QDateTime::currentDateTime().toTime_t());
++    QString oauthTimestamp =
++        QString("%1").arg(QDateTime::currentDateTime().toSecsSinceEpoch());
+     authHeader.append(EQUAL_WITH_QUOTES.arg(OAUTH_TIMESTAMP)
+                       .arg(urlEncode(oauthTimestamp)));
+     authHeader.append(DELIMITER);
+diff --git a/src/oauth2plugin.cpp b/src/oauth2plugin.cpp
+index d65e261..418e7db 100644
+--- a/src/oauth2plugin.cpp
++++ b/src/oauth2plugin.cpp
+@@ -239,7 +239,7 @@ bool OAuth2Plugin::respondWithStoredToken(const QVariantMap &token,
+         timeToExpiry =
+             token.value(EXPIRY).toUInt() +
+             token.value(TIMESTAMP).toUInt() -
+-            QDateTime::currentDateTime().toTime_t();
++            QDateTime::currentDateTime().toSecsSinceEpoch();
+         if (timeToExpiry < 0) {
+             TRACE() << "Stored token is expired";
+             return false;
+@@ -762,7 +762,7 @@ void OAuth2Plugin::storeResponse(const OAuth2PluginTokenData &response)
+     if (response.ExpiresIn() > 0) {
+         token.insert(EXPIRY, response.ExpiresIn());
+     }
+-    token.insert(TIMESTAMP, QDateTime::currentDateTime().toTime_t());
++    token.insert(TIMESTAMP, QDateTime::currentDateTime().toSecsSinceEpoch());
+     token.insert(SCOPES, d->m_oauth2Data.Scope());
+     token.insert(EXTRA_FIELDS, response.ExtraFields());
+     d->m_tokens.insert(d->m_key, QVariant::fromValue(token));
+diff --git a/tests/oauth2plugintest.cpp b/tests/oauth2plugintest.cpp
+index 7d6f563..94e5c43 100644
+--- a/tests/oauth2plugintest.cpp
++++ b/tests/oauth2plugintest.cpp
+@@ -320,7 +320,7 @@ void OAuth2PluginTest::testPluginProcess_data()
+     QVariantMap token;
+     token.insert("Token", QLatin1String("tokenfromtest"));
+     token.insert("Token2", QLatin1String("token2fromtest"));
+-    token.insert("timestamp", QDateTime::currentDateTime().toTime_t());
++    token.insert("timestamp", QDateTime::currentDateTime().toSecsSinceEpoch());
+     token.insert("Expiry", 10000);
+     tokens.insert(QLatin1String("invalidid"), QVariant::fromValue(token));
+     webServerData.m_data.insert(QLatin1String("Tokens"), tokens);
+@@ -545,7 +545,7 @@ void OAuth2PluginTest::testPluginHmacSha1Process_data()
+     QVariantMap token;
+     token.insert("oauth_token", QLatin1String("hmactokenfromtest"));
+     token.insert("oauth_token_secret", QLatin1String("hmacsecretfromtest"));
+-    token.insert("timestamp", QDateTime::currentDateTime().toTime_t());
++    token.insert("timestamp", QDateTime::currentDateTime().toSecsSinceEpoch());
+     token.insert("Expiry", (uint)50000);
+     tokens.insert(QLatin1String("invalidid"), QVariant::fromValue(token));
+     hmacSha1Data.m_data.insert(QLatin1String("Tokens"), tokens);
+@@ -591,7 +591,8 @@ void OAuth2PluginTest::testPluginHmacSha1Process_data()
+         true << QVariantMap() << QVariantMap();
+     hmacSha1Data.setForceTokenRefresh(false);
+ 
+-    token.insert("timestamp", QDateTime::currentDateTime().toTime_t() - 50000);
++    token.insert("timestamp",
++                 QDateTime::currentDateTime().toSecsSinceEpoch() - 50000);
+     token.insert("Expiry", (uint)100);
+     tokens.insert(hmacSha1Data.ConsumerKey(), QVariant::fromValue(token));
+     hmacSha1Data.m_data.insert(QLatin1String("Tokens"), tokens);
+@@ -1650,7 +1651,8 @@ void OAuth2PluginTest::testRefreshToken_data()
+     QVariantMap tokens;
+     QVariantMap token;
+     token.insert("Token", QLatin1String("tokenfromtest"));
+-    token.insert("timestamp", QDateTime::currentDateTime().toTime_t() - 10000);
++    token.insert("timestamp",
++                 QDateTime::currentDateTime().toSecsSinceEpoch() - 10000);
+     token.insert("Expiry", 1000);
+     token.insert("refresh_token", QString("r3fr3sh"));
+     tokens.insert(data.ClientId(), QVariant::fromValue(token));
+@@ -1665,7 +1667,7 @@ void OAuth2PluginTest::testRefreshToken_data()
+ 
+     QTest::newRow("expired access token") << data.toMap() << response;
+ 
+-    token.insert("timestamp", QDateTime::currentDateTime().toTime_t());
++    token.insert("timestamp", QDateTime::currentDateTime().toSecsSinceEpoch());
+     token.insert("Expiry", 50000);
+     token.insert("ExtraFields", QVariantMap());
+     tokens.insert(data.ClientId(), QVariant::fromValue(token));
+@@ -1755,7 +1757,8 @@ void OAuth2PluginTest::testRefreshTokenError()
+     QVariantMap tokens;
+     QVariantMap token;
+     token.insert("Token", QLatin1String("tokenfromtest"));
+-    token.insert("timestamp", QDateTime::currentDateTime().toTime_t() - 10000);
++    token.insert("timestamp",
++                 QDateTime::currentDateTime().toSecsSinceEpoch() - 10000);
+     token.insert("Expiry", 1000);
+     token.insert("refresh_token", QString("r3fr3sh"));
+     tokens.insert(data.ClientId(), QVariant::fromValue(token));
+-- 
+GitLab
+
+From d1626628a65d47a8c764c6f1049781eb385d0cb8 Mon Sep 17 00:00:00 2001
+From: Alberto Mardegan <mardy@users.sourceforge.net>
+Date: Sun, 20 Dec 2020 22:42:04 +0300
+Subject: [PATCH] build: disable deprecation warnings
+
+But at the same time add a compilation flag to disable all methods which
+have been deprecated in Qt 5.9 (to make sure we don't lag too much
+behind :-) ).
+---
+ common-project-config.pri | 5 ++++-
+ src/common.h              | 2 --
+ 2 files changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/common-project-config.pri b/common-project-config.pri
+index e149d90..c0d2e80 100644
+--- a/common-project-config.pri
++++ b/common-project-config.pri
+@@ -25,7 +25,10 @@ unix:QMAKE_CXXFLAGS += -Werror
+ TOP_SRC_DIR     = $$PWD
+ 
+ #DEFINES += QT_NO_DEBUG_OUTPUT
+-DEFINES += SIGNON_TRACE
++DEFINES += \
++    SIGNON_TRACE \
++    QT_DISABLE_DEPRECATED_BEFORE=0x050900 \
++    QT_NO_DEPRECATED_WARNINGS
+ 
+ #-----------------------------------------------------------------------------
+ # setup the installation prefix
+diff --git a/src/common.h b/src/common.h
+index c6201a1..a65525e 100644
+--- a/src/common.h
++++ b/src/common.h
+@@ -33,6 +33,4 @@
+ #define TRACE() if (0) qDebug()
+ #endif
+ 
+-#define QT_DISABLE_DEPRECATED_BEFORE QT_VERSION_CHECK(4, 0, 0)
+-
+ #endif // SIGNON_PLUGIN_OAUTH2_COMMON
+-- 
+GitLab
+
+From 7b5fcc221bc22ca8ce45a05a61d3227262a5d42d Mon Sep 17 00:00:00 2001
+From: Alberto Mardegan <mardy@users.sourceforge.net>
+Date: Sun, 20 Dec 2020 22:53:48 +0300
+Subject: [PATCH] README: specify the minimum version of Qt
+
+---
+ README.md | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/README.md b/README.md
+index 24cc33c..4f174a4 100644
+--- a/README.md
++++ b/README.md
+@@ -14,9 +14,10 @@ See COPYING file.
+ Build instructions
+ ------------------
+ 
+-This project depends on Qt 5 and [signond](https://gitlab.com/accounts-sso/signond). To build it, just run
++This project depends on Qt 5.8 (or newer) and
++[signond](https://gitlab.com/accounts-sso/signond). To build it, just run
+ ```
+   qmake
+   make
+   make install
+-```
+\ No newline at end of file
++```
+-- 
+GitLab
+
+From 2bf858a8c92aadaf75ce8213ea037fe7db544ae8 Mon Sep 17 00:00:00 2001
+From: Pino Toscano <toscano.pino@tiscali.it>
+Date: Sat, 2 Jan 2021 14:26:52 +0100
+Subject: [PATCH] build: stop using -Werror
+
+-Werror turns every single compiler warning into an error; while this
+seems nice to catch potential issues, in reality:
+- newer versions of Qt deprecated more APIs (and currently some APIs
+  deprecated in Qt 5.14 & 5.15 are still used)
+- newer versions of the compiler can be more strict, and generate more
+  warnings; sometimes they are not really issues
+
+Hence, stop using -Werror altogether.
+---
+ common-project-config.pri | 2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/common-project-config.pri b/common-project-config.pri
+index c0d2e80..a2ffac0 100644
+--- a/common-project-config.pri
++++ b/common-project-config.pri
+@@ -19,8 +19,6 @@ UI_SOURCES_DIR  = ui/src
+ 
+ QMAKE_CXXFLAGS += -fno-exceptions \
+     -fno-rtti
+-# we don't like warnings...
+-unix:QMAKE_CXXFLAGS += -Werror
+ 
+ TOP_SRC_DIR     = $$PWD
+ 
+-- 
+GitLab
+
+From d759439066f0a34e5ad352ebab0b3bb2790d429e Mon Sep 17 00:00:00 2001
+From: Pino Toscano <toscano.pino@tiscali.it>
+Date: Sat, 2 Jan 2021 14:35:59 +0100
+Subject: [PATCH] build: enable again Qt deprecation warnings
+
+Now that -Werror is not used anymore, we can safely enable again the
+deprecation warnings for Qt; this way, it will be easier to spot
+deprecated APIs.
+
+Reverts part of commit d1626628a65d47a8c764c6f1049781eb385d0cb8.
+---
+ common-project-config.pri | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/common-project-config.pri b/common-project-config.pri
+index a2ffac0..1d5cdc6 100644
+--- a/common-project-config.pri
++++ b/common-project-config.pri
+@@ -25,8 +25,7 @@ TOP_SRC_DIR     = $$PWD
+ #DEFINES += QT_NO_DEBUG_OUTPUT
+ DEFINES += \
+     SIGNON_TRACE \
+-    QT_DISABLE_DEPRECATED_BEFORE=0x050900 \
+-    QT_NO_DEPRECATED_WARNINGS
++    QT_DISABLE_DEPRECATED_BEFORE=0x050900
+ 
+ #-----------------------------------------------------------------------------
+ # setup the installation prefix
+-- 
+GitLab
+
