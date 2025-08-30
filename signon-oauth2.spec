@@ -1,4 +1,3 @@
-# TODO: fix build with qt6 based signon
 #
 # Conditional build:
 %bcond_with	qt5	# build with qt5-based signon
